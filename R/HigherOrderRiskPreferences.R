@@ -292,7 +292,7 @@ evaluate_cross_validation <- function(xi,
 #' find_optimal_lambda(x, y)
 #' @importFrom stats optim
 #' @importFrom utils combn
-#' @importFrom spatstat ppp pairdist
+#' @importFrom spatstat.geom ppp pairdist
 #' @export 
 find_optimal_lambda <- function(xi,
                                 yi,
@@ -468,23 +468,30 @@ compute_function <- function(x,
   }
   
   if (penalty_order > 4) {
+    message(
+      "This program has not been tested with order of penalties higher than 4 and it might produce wrong or unexpected results."
+    )
     warning(
       "This program has not been tested with order of penalties higher than 4 and it might produce wrong or unexpected results."
     )
   }
-  
-  if (mode == 0 || mode == 1) {
+  if (verbose){
     if (mode == 0) {
       message("Using multiple imputation mode.")
-    } else {
+    } else if (mode == 1) {
       message("Using optimal classification mode.")
-      if (penalty_order != 3 & penalty_order != 4) {
-        stop("The orders of penalty for optimal classification can either be 3 or 4.")
-      }
+    } else {
+      message("Using weak classification mode.")
     }
-    n_penalty_dimensions = 2
-  } else {
-    message("Using weak classification mode.")
+  }
+  
+  n_penalty_dimensions = 2
+  
+  if (mode == 1) {
+    if (penalty_order != 3 & penalty_order != 4) {
+      stop("The orders of penalty for optimal classification can either be 3 or 4.")
+    }
+  } else if (mode == 2) {
     n_penalty_dimensions = 1
   }
   
@@ -500,27 +507,41 @@ compute_function <- function(x,
     max_length_xi <- max(max_length_xi, length(xi))
   }
   
-  if (ndx < min_length_xi | ndx >= 2.5 * max_length_xi) {
+  
+  if (ndx < min_length_xi | ndx >= 4 * (max_length_xi+2)) {
+    message(
+      paste(
+        "The value of ndx should be larger than or equal to the minimum length of xi existing in the dataset",
+        " and not too large compared to the the maximum length of xi existing in the dataset (say, less than 4 times this number).",
+        "Other values have not been tested to yield reliable results.",
+        "Consider allowing a higher (lower) degree of flexibility and increase (decrease) the value of ndx."
+      )
+    )
     warning(
       paste(
         "The value of ndx should be larger than or equal to the minimum length of xi existing in the dataset",
-        " and smaller than 2.5 times the maximum length of xi existing in the dataset.",
+        " and not too large compared to the the maximum length of xi existing in the dataset (say, less than 4 times this number).",
         "Other values have not been tested to yield reliable results.",
         "Consider allowing a higher (lower) degree of flexibility and increase (decrease) the value of ndx."
       )
     )
   }
   
-  # deg is larger than 1, but still lower than 2.5 * min(length(xi))
-  if (deg < 1 | deg >= 1.2 * min_length_xi)  {
+  # deg should be larger than 1, but still lower than 1.2 * min(length(xi))
+  if (deg < 1 | deg > 1.2 * min_length_xi)  {
+    message(
+      paste(
+        "The value of deg should be larger than or equal to 1 and not exceed 1.2 times the minimum length of xi existing in the dataset.",
+        "The amount of data is likely too small to fit such a flexible model, consider lowering deg."
+      )
+    )
     warning(
       paste(
-        "The value of deg should be larger than or equal to 1 and smaller than 1.2 times the minimum length of xi existing in the dataset.",
+        "The value of deg should be larger than or equal to 1 and not exceed 1.2 times the minimum length of xi existing in the dataset.",
         "The amount of data is likely too small to fit such a flexible model, consider lowering deg."
       )
     )
   }
-  
   return (
     compute_function_aux(
       x,
@@ -532,7 +553,8 @@ compute_function <- function(x,
       current_lambda,
       n_penalty_dimensions,
       ndx,
-      deg
+      deg,
+      verbose
     )
   )
 }
@@ -550,17 +572,19 @@ compute_function <- function(x,
 #' @param n_penalty_dimensions number of dimensions to penalise. Possible values are 1 or 2. The default value is 1.
 #' @param ndx number of intervals to partition the distance between the lowest and highest x-values of the utility points.
 #' @param deg degree of the B-spline basis. Determines the degree of the function to be estimated. If deg = 2, the estimated utility function will consist of quadratic functions. 
+#' @param verbose shows some information while the program is running.
 #' @return A smooth and continuous utility function.
 compute_function_aux <- function(x,
-                                  y,
-                                  ids,
-                                  mode = 1,
-                                  penalty_order = 4,
-                                  lambda_max = 10000,
-                                  current_lambda = 1,
-                                  n_penalty_dimensions = 1,
-                                  ndx = 20,
-                                  deg = 6) {
+                                 y,
+                                 ids,
+                                 mode = 1,
+                                 penalty_order = 4,
+                                 lambda_max = 10000,
+                                 current_lambda = 1,
+                                 n_penalty_dimensions = 1,
+                                 ndx = 20,
+                                 deg = 6,
+                                 verbose = 0) {
   nval_grid <- 1000
   coeffs <- data.frame(row.names = ids, matrix(NA, nrow = nrow(x), ncol = (ndx + deg)))
   x_finegrids <- data.frame(row.names = ids, matrix(0, nrow = nrow(x), ncol = (nval_grid + 1)))
@@ -574,11 +598,12 @@ compute_function_aux <- function(x,
     }
     id <- ids[i]
     
-    
     # Consider only the columns which are not NA
     yi <- yi[!is.na(xi)]
     xi <- xi[!is.na(xi)]
-    message(paste("Considering participant with id", id))
+    if (verbose){
+      message(paste("Considering participant with id", id))
+    }
   
     # Rescale
     xi <- xi / max(abs(xi))
@@ -671,8 +696,8 @@ compute_function_aux <- function(x,
     }
     
     x_finegrid <- seq(min(xi), max(xi), (max(xi) - min(xi)) / nval_grid)
-    coeffs[id, ] <- coeff
-    x_finegrids[id, ] <- x_finegrid
+    coeffs[i, ] <- coeff
+    x_finegrids[i, ] <- x_finegrid
   }
   
   return(list(x_finegrids, coeffs))
@@ -695,7 +720,6 @@ compute_measures_aux <- function(x_grids,
                                   deg = 6,
                                   measures = c("risk-arrow-pratt", "crainich-eeckhoudt", "denuit-eeckhoudt"),
                                   ...)  {
-  # TODO: Check if there is a problem with column names and functions
   output_measures <- data.frame(row.names = ids, matrix(0, nrow = length(ids), ncol = length(measures)))
   for (i in 1:nrow(coeffs)) {
     coeff <- as.numeric(coeffs[i,])
@@ -861,7 +885,10 @@ derivative <- function(x,
 #' compute_higher_order_risk_preferences(x, y, mode = 1)
 #' 
 #' # could be used with root_filename argument: 
-#' # outfile <- paste(dirname(getwd()), "/out/output", sep="")
+#' # Linux
+#' # outfile <- paste(dirname(getwd()), "/out", sep="")
+#' # Win
+#' # outfile <- paste(dirname(getwd()), "\out", sep="")
 #' compute_higher_order_risk_preferences(x, y, mode = 2, verbose = 1)
 #' }
 #' @importFrom utils write.csv
@@ -869,7 +896,7 @@ derivative <- function(x,
 compute_higher_order_risk_preferences <- function(x,
                                                   y,
                                                   ids = NULL,
-                                                  mode = 0,
+                                                  mode = 1,
                                                   penalty_orders = c(4),
                                                   ndx = 20,
                                                   deg = 6,
@@ -910,14 +937,6 @@ compute_higher_order_risk_preferences <- function(x,
     stop("Please convert the ids field to a list or a vector.")
   }
   
-  if (!verbose) {
-    if(.Platform$OS.type == "unix") {
-      sink(file = "/dev/null") # use /dev/null in UNIX
-    } else {
-      sink(file = "NUL") # use /dev/null in UNIX
-    }
-  }
-  
   if (is.null(ids)) {
     ids = seq(from = 1,
               to = nrow(x),
@@ -938,12 +957,14 @@ compute_higher_order_risk_preferences <- function(x,
       )
     }
     if (order > 4) {
+      message(
+        "This program has not been tested with order of penalties higher than 4 and it might produce wrong or unexpected results."
+      )
       warning(
         "This program has not been tested with order of penalties higher than 4 and it might produce wrong or unexpected results."
       )
     }
   }
-  
   
   xi <- x[1, ]
   xi <- xi[!is.na(xi)]
@@ -958,6 +979,14 @@ compute_higher_order_risk_preferences <- function(x,
   }
   
   if (ndx < min_length_xi | ndx >= 4 * (max_length_xi+2)) {
+    message(
+      paste(
+        "The value of ndx should be larger than or equal to the minimum length of xi existing in the dataset",
+        " and not too large compared to the the maximum length of xi existing in the dataset (say, less than 4 times this number).",
+        "Other values have not been tested to yield reliable results.",
+        "Consider allowing a higher (lower) degree of flexibility and increase (decrease) the value of ndx."
+      )
+    )
     warning(
       paste(
         "The value of ndx should be larger than or equal to the minimum length of xi existing in the dataset",
@@ -970,6 +999,12 @@ compute_higher_order_risk_preferences <- function(x,
   
   # deg should be larger than 1, but still lower than 1.2 * min(length(xi))
   if (deg < 1 | deg > 1.2 * min_length_xi)  {
+    message(
+      paste(
+        "The value of deg should be larger than or equal to 1 and not exceed 1.2 times the minimum length of xi existing in the dataset.",
+        "The amount of data is likely too small to fit such a flexible model, consider lowering deg."
+      )
+    )
     warning(
       paste(
         "The value of deg should be larger than or equal to 1 and not exceed 1.2 times the minimum length of xi existing in the dataset.",
@@ -984,11 +1019,9 @@ compute_higher_order_risk_preferences <- function(x,
     lambda_max = 10000
     if (mode == 0) {
       mode_txt <- "MI"
-      message("Using multiple imputation mode.")
       lambda_fix_loop_lambdas <- 1:15
     } else {
       mode_txt <- "opt"
-      message("Using optimal classification mode.")
       for (order in penalty_orders) {
         if (order != 3 & order != 4) {
           stop("The orders of penalty for optimal classification can either be 3 or 4.")
@@ -998,20 +1031,35 @@ compute_higher_order_risk_preferences <- function(x,
     }
     n_penalty_dimensions = 2
   } else {
-    message("Using weak classification mode.")
     lambda_fix_loop_lambdas <- c(.1, 1, 10, 20, 50, 100, 500, 750, 1000, 2000, 5000, 10000)
     n_penalty_dimensions = 1
   }
   
+  if (verbose){
+    if (mode == 0) {
+      message("Using multiple imputation mode.")
+    } else if (mode == 1) {
+      message("Using optimal classification mode.")
+    } else {
+      message("Using weak classification mode.")
+    }
+  }
+  
+  time_begin <- format(Sys.time(), "%y.%m.%d_%H.%M.%OS")
+  return_val = NULL
   # Loop over the penalization order
   for (penalty_order in penalty_orders) {
     # Start smoothing & classification
-    message(paste("Smoothing over the", penalty_order, "order of penalty."))
+    if (verbose){
+      message(paste("Smoothing over the", penalty_order, "order of penalty."))
+    }
     
     # Iterate over the lambdas, only once for optimization
     for (lambda_fix_loop in lambda_fix_loop_lambdas) {
       # Start smoothing & classification
-      message("Computing the function for all individuals.")
+      if (verbose){
+        message("Computing the function for all individuals.")
+      }
       fct <-
         compute_function_aux(
           x,
@@ -1023,39 +1071,55 @@ compute_higher_order_risk_preferences <- function(x,
           lambda_fix_loop,
           n_penalty_dimensions,
           ndx,
-          deg
+          deg,
+          verbose
         )
       
       x_grids <- fct[[1]]
       coeffs <- fct[[2]]
-      message("Computing the measures for all individuals.")
+      if (verbose){
+        message("Computing the measures for all individuals.")
+      }
       out_measures <- compute_measures_aux(x_grids, coeffs, row.names(coeffs), ndx, deg, measures)
-      if (!is.null(root_filename)){
-        addition_filename <-
+      if (verbose) {
+        message("The measures have been computed.")
+      }
+      if (!is.null(root_filename)) {
+        if (verbose) {
+          message("Printing current run...")
+        }
+        specific_folder <-
           paste(
-            "_",
-            penalty_order,
-            "_",
-            lambda_fix_loop,
-            "_",
             mode_txt,
             "_",
-            format(Sys.time(), "%y.%m.%d_%H:%M:%OS"),
-            ".csv",
+            time_begin,
             sep = ""
           )
         
-        filesave <- paste(root_filename, "_", "x", addition_filename, sep="")
-
-        dir.create(dirname(filesave), showWarnings = FALSE)
-        write.csv(x_grids, file = filesave)
-        write.csv(coeffs, file = paste(root_filename, "_", "coeffs", addition_filename, sep=""))
-        write.csv(out_measures, file = paste(root_filename, "_", "measures", addition_filename, sep=""))
+        addition_folder <-
+          paste(
+            "pord",
+            penalty_order,
+            "_lambda",
+            lambda_fix_loop,
+            sep = ""
+          )
+        
+        folder_save <- file.path(root_filename, specific_folder, addition_folder, "")
+        dir.create(folder_save, recursive = TRUE, showWarnings = FALSE)
+        write.csv(x_grids, file = paste(folder_save, "x_grids.csv", sep=""))
+        write.csv(coeffs, file = paste(folder_save, "coeffs.csv", sep=""))
+        write.csv(out_measures, file = paste(folder_save, "measures.csv", sep=""))
+        if (verbose) {
+          message(paste("Saved in", folder_save))
+        }
+      }
+    
+      if (mode == 1){
+        return_val = fct
       }
     }
   }
   
-  if (!verbose) {
-    sink()
-  }
+  return(return_val)
 }

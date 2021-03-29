@@ -8,7 +8,7 @@ compute_higher_order_risk_preferences(
   x,
   y,
   ids = NULL,
-  mode = 0,
+  mode = 1,
   penalty_orders = c(4),
   ndx = 20,
   deg = 6,
@@ -57,7 +57,10 @@ y <- c(0.25, 0.375, 0.5, 0.625, 0.75)
 compute_higher_order_risk_preferences(x, y, mode = 1)
 
 # could be used with root_filename argument: 
-# outfile <- paste(dirname(getwd()), "/out/output", sep="")
+# Linux
+# outfile <- paste(dirname(getwd()), "/out", sep="")
+# Win
+# outfile <- paste(dirname(getwd()), "\out", sep="")
 compute_higher_order_risk_preferences(x, y, mode = 2, verbose = 1)
 }
 }

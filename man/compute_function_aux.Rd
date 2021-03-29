@@ -14,7 +14,8 @@ compute_function_aux(
   current_lambda = 1,
   n_penalty_dimensions = 1,
   ndx = 20,
-  deg = 6
+  deg = 6,
+  verbose = 0
 )
 }
 \arguments{
@@ -37,6 +38,8 @@ compute_function_aux(
 \item{ndx}{number of intervals to partition the distance between the lowest and highest x-values of the utility points.}
 
 \item{deg}{degree of the B-spline basis. Determines the degree of the function to be estimated. If deg = 2, the estimated utility function will consist of quadratic functions.}
+
+\item{verbose}{shows some information while the program is running.}
 }
 \value{
 A smooth and continuous utility function.
