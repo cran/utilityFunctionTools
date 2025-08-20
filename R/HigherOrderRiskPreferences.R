@@ -1,8 +1,10 @@
 # Authors
 # Sebastian Schneider, sschneider@coll.mpg.de; sebastian@sebastianschneider.eu
+# Programmers
+# Sebastian Schneider, sschneider@coll.mpg.de; sebastian@sebastianschneider.eu
 # Giulia Baldini, giulia.baldini@uni-bonn.de
 
-# Copyright (C) 2020 Sebastian O. Schneider & Giulia Baldini
+# Copyright (C) 2025 Sebastian O. Schneider
 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -410,7 +412,7 @@ compute_function <- function(x,
                              verbose = 0) {
   if (is.data.frame(x)) {
     # If the data is a dataframe
-    x <- as.matrix(sapply(x, as.numeric))   # convert to matrix
+      x <- as.matrix(sapply(x, as.numeric))   # convert to matrix
   } else if (!is.matrix(x)) {
     stop("Please convert x to a dataframe or to a matrix before calling this function.")
   }
@@ -495,16 +497,16 @@ compute_function <- function(x,
     n_penalty_dimensions = 1
   }
   
-  xi <- x[1, ]
-  xi <- xi[!is.na(xi)]
-  min_length_xi <- length(xi)
-  max_length_xi <- length(xi)
-  for (i in 2:nrow(x)) {
+  #xi <- x[1, ]
+  #xi <- xi[!is.na(xi)]
+  min_length_xi <- NA #length(xi)
+  max_length_xi <- NA #length(xi)
+  for (i in 1:nrow(x)) {
     # Find the xi of minimum length
     xi <- x[i, ]
     xi <- xi[!is.na(xi)]
-    min_length_xi <- min(min_length_xi, length(xi))
-    max_length_xi <- max(max_length_xi, length(xi))
+    min_length_xi <- min(min_length_xi, length(xi), na.rm = T)
+    max_length_xi <- max(max_length_xi, length(xi), na.rm = T)
   }
   
   
@@ -853,7 +855,7 @@ derivative <- function(x,
                        deg = 6) {
   dB = bbase(x = x, ndx = ndx, deg = deg - degree)
   for (i in 1:degree) {
-    coeffs <- (diff(coeffs) / ndx)
+    coeffs <- (diff(coeffs) * ndx)
   }
   dy = dB %*% coeffs
   range = abs(min(dy) - max(dy))
@@ -916,7 +918,7 @@ compute_higher_order_risk_preferences <- function(x,
     if (nrow(y) == 1) {
       y <- as.vector(sapply(x, as.numeric))   # convert to vector
     } else {
-      y <- as.matrix(sapply(x, as.numeric))   # convert to matrix
+      y <- as.matrix(sapply(y, as.numeric))   # convert to matrix
     }
   }
   
@@ -966,16 +968,16 @@ compute_higher_order_risk_preferences <- function(x,
     }
   }
   
-  xi <- x[1, ]
-  xi <- xi[!is.na(xi)]
-  min_length_xi <- length(xi)
-  max_length_xi <- length(xi)
-  for (i in 2:nrow(x)) {
+  #xi <- x[1, ]
+  #xi <- xi[!is.na(xi)]
+  min_length_xi <- NA #length(xi)
+  max_length_xi <- NA #length(xi)
+  for (i in 1:nrow(x)) {
     # Find the xi of minimum length
     xi <- x[i, ]
     xi <- xi[!is.na(xi)]
-    min_length_xi <- min(min_length_xi, length(xi))
-    max_length_xi <- max(max_length_xi, length(xi))
+    min_length_xi <- min(min_length_xi, length(xi), na.rm = T)
+    max_length_xi <- max(max_length_xi, length(xi), na.rm = T)
   }
   
   if (ndx < min_length_xi | ndx >= 4 * (max_length_xi+2)) {
@@ -1116,7 +1118,7 @@ compute_higher_order_risk_preferences <- function(x,
       }
     
       if (mode == 1){
-        return_val = fct
+        return_val = out_measures
       }
     }
   }
